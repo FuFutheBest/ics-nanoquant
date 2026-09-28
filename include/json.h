@@ -10,20 +10,22 @@
 #include <vector>
 
 struct jval {
-    enum kind_t { NUL, BOOL, INT, NUM, STR, ARR, OBJ } kind = NUL;
-    bool        b   = false;
-    int64_t     i   = 0;
-    double      d   = 0;
-    std::string s;
-    std::vector<jval>                          arr;
-    std::vector<std::pair<std::string, jval>>  obj;
+  enum kind_t { NUL, BOOL, INT, NUM, STR, ARR, OBJ } kind = NUL;
+  bool b = false;
+  int64_t i = 0;
+  double d = 0;
+  std::string s;
+  std::vector<jval> arr;
+  std::vector<std::pair<std::string, jval>> obj;
 
-    const jval *get(const char *key) const {
-        for (const auto &kv : obj) if (kv.first == key) return &kv.second;
-        return nullptr;
-    }
-    bool is_int() const { return kind == INT; }
-    int64_t as_i64() const { return kind == INT ? i : (int64_t)d; }
+  const jval *get(const char *key) const {
+    for (const auto &kv : obj)
+      if (kv.first == key)
+        return &kv.second;
+    return nullptr;
+  }
+  bool is_int() const { return kind == INT; }
+  int64_t as_i64() const { return kind == INT ? i : (int64_t)d; }
 };
 
 bool json_parse(const char *p, size_t n, jval *out, std::string *err);

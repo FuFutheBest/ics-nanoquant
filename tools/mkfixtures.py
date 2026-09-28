@@ -13,6 +13,7 @@ and tiny-meta/, a config.json and a minimal vocabulary for tiny.
 
 The contents come from a fixed-seed generator: the same bytes on every machine.
 """
+
 import json
 import os
 import struct
@@ -23,18 +24,21 @@ def bf16_bytes(vals):
     """Truncate floats to BF16, little-endian bytes."""
     out = bytearray()
     for v in vals:
-        u = struct.unpack('<I', struct.pack('<f', v))[0]
-        out += struct.pack('<H', u >> 16)
+        u = struct.unpack("<I", struct.pack("<f", v))[0]
+        out += struct.pack("<H", u >> 16)
     return bytes(out)
 
 
 class Lcg:
     """The generator of nq-selftest."""
+
     def __init__(self, seed):
-        self.s = seed & 0xffffffffffffffff
+        self.s = seed & 0xFFFFFFFFFFFFFFFF
 
     def next32(self):
-        self.s = (self.s * 6364136223846793005 + 1442695040888963407) & 0xffffffffffffffff
+        self.s = (
+            self.s * 6364136223846793005 + 1442695040888963407
+        ) & 0xFFFFFFFFFFFFFFFF
         return self.s >> 32
 
     def uniform(self):
@@ -54,17 +58,17 @@ def tiny_tensors():
     for i in range(LAYERS):
         p = "model.language_model.layers.%d." % i
         t += [
-            (p + "input_layernorm.weight",          [HIDDEN]),
-            (p + "self_attn.q_proj.weight",         [HEADS * HEAD_DIM, HIDDEN]),
-            (p + "self_attn.k_proj.weight",         [KV_HEADS * HEAD_DIM, HIDDEN]),
-            (p + "self_attn.v_proj.weight",         [KV_HEADS * HEAD_DIM, HIDDEN]),
-            (p + "self_attn.o_proj.weight",         [HIDDEN, HEADS * HEAD_DIM]),
-            (p + "self_attn.q_norm.weight",         [HEAD_DIM]),
-            (p + "self_attn.k_norm.weight",         [HEAD_DIM]),
+            (p + "input_layernorm.weight", [HIDDEN]),
+            (p + "self_attn.q_proj.weight", [HEADS * HEAD_DIM, HIDDEN]),
+            (p + "self_attn.k_proj.weight", [KV_HEADS * HEAD_DIM, HIDDEN]),
+            (p + "self_attn.v_proj.weight", [KV_HEADS * HEAD_DIM, HIDDEN]),
+            (p + "self_attn.o_proj.weight", [HIDDEN, HEADS * HEAD_DIM]),
+            (p + "self_attn.q_norm.weight", [HEAD_DIM]),
+            (p + "self_attn.k_norm.weight", [HEAD_DIM]),
             (p + "post_attention_layernorm.weight", [HIDDEN]),
-            (p + "mlp.gate_proj.weight",            [INTER, HIDDEN]),
-            (p + "mlp.up_proj.weight",              [INTER, HIDDEN]),
-            (p + "mlp.down_proj.weight",            [HIDDEN, INTER]),
+            (p + "mlp.gate_proj.weight", [INTER, HIDDEN]),
+            (p + "mlp.up_proj.weight", [INTER, HIDDEN]),
+            (p + "mlp.down_proj.weight", [HIDDEN, INTER]),
         ]
     t += [("model.language_model.norm.weight", [HIDDEN])]
     # a few vision tower tensors, which nano-quant leaves out
@@ -80,13 +84,17 @@ def write_safetensors(path, entries, big_endian_len=False):
     """entries: [(name, shape, bytes)]."""
     header, off = {}, 0
     for name, shape, blob in entries:
-        header[name] = {"dtype": "BF16", "shape": shape, "data_offsets": [off, off + len(blob)]}
+        header[name] = {
+            "dtype": "BF16",
+            "shape": shape,
+            "data_offsets": [off, off + len(blob)],
+        }
         off += len(blob)
-    js = json.dumps(header, separators=(',', ':')).encode()
-    pad = (-len(js)) % 8                      # pad the header to a multiple of 8, as safetensors allows
-    js += b' ' * pad
-    fmt = '>Q' if big_endian_len else '<Q'
-    with open(path, 'wb') as f:
+    js = json.dumps(header, separators=(",", ":")).encode()
+    pad = (-len(js)) % 8  # pad the header to a multiple of 8, as safetensors allows
+    js += b" " * pad
+    fmt = ">Q" if big_endian_len else "<Q"
+    with open(path, "wb") as f:
         f.write(struct.pack(fmt, len(js)))
         f.write(js)
         for _, _, blob in entries:
@@ -102,7 +110,9 @@ def make_tiny(path, be=False):
         for d in shape:
             n *= d
         if name.endswith("norm.weight") and len(shape) == 1:
-            vals = [0.5 + r.uniform() for _ in range(n)]      # norm weights are all positive
+            vals = [
+                0.5 + r.uniform() for _ in range(n)
+            ]  # norm weights are all positive
         else:
             vals = [r.weight(0.05) for _ in range(n)]
         entries.append((name, shape, bf16_bytes(vals)))
@@ -118,11 +128,16 @@ def make_meta_dir(d):
         "model_type": "qwen3_vl",
         "tie_word_embeddings": True,
         "text_config": {
-            "hidden_size": HIDDEN, "intermediate_size": INTER,
-            "num_hidden_layers": LAYERS, "num_attention_heads": HEADS,
-            "num_key_value_heads": KV_HEADS, "head_dim": HEAD_DIM,
-            "max_position_embeddings": 4096, "rms_norm_eps": 1e-6,
-            "rope_theta": 5000000.0, "vocab_size": VOCAB,
+            "hidden_size": HIDDEN,
+            "intermediate_size": INTER,
+            "num_hidden_layers": LAYERS,
+            "num_attention_heads": HEADS,
+            "num_key_value_heads": KV_HEADS,
+            "head_dim": HEAD_DIM,
+            "max_position_embeddings": 4096,
+            "rms_norm_eps": 1e-6,
+            "rope_theta": 5000000.0,
+            "vocab_size": VOCAB,
             "rope_scaling": {"mrope_section": [16, 8, 8], "rope_type": "default"},
         },
         "vision_config": {"deepstack_visual_indexes": [1, 2, 3]},
@@ -152,8 +167,10 @@ def make_meta_dir(d):
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "tests/fixtures"
     os.makedirs(out, exist_ok=True)
-    for name, fn in (("tiny.safetensors", lambda p: make_tiny(p)),
-                     ("tiny-be.safetensors", lambda p: make_tiny(p, be=True))):
+    for name, fn in (
+        ("tiny.safetensors", lambda p: make_tiny(p)),
+        ("tiny-be.safetensors", lambda p: make_tiny(p, be=True)),
+    ):
         p = os.path.join(out, name)
         print("%-22s %8d bytes" % (name, fn(p)))
     make_meta_dir(os.path.join(out, "tiny-meta"))

@@ -28,23 +28,25 @@
  * bit, the hardware rounds the sum to nearest even, and the low bits of the
  * result are the integer. |f| must be below 2^22. */
 static inline int nq_round(float f) {
-    float v = f + 12582912.0f;
-    int32_t i;
-    memcpy(&i, &v, sizeof i);
-    return (i & 0x007fffff) - 0x00400000;
+  float v = f + 12582912.0f;
+  int32_t i;
+  memcpy(&i, &v, sizeof i);
+  return (i & 0x007fffff) - 0x00400000;
 }
 
 /* Fit one Q4_K sub-block of 32 weights: find *scale >= 0 and *min >= 0 so that
  * x[i] is close to scale * q[i] - min for codes q[i] in 0..15. The fit is a
  * weighted least-squares search over 21 candidate scales, the same search as
- * make_qkx2_quants in ggml. It is implemented in src/q4_k_fit.cpp, and README.md,
- * part B, gives its formulas; q4_k_quantize calls it once per sub-block. */
+ * make_qkx2_quants in ggml. It is implemented in src/q4_k_fit.cpp, and
+ * README.md, part B, gives its formulas; q4_k_quantize calls it once per
+ * sub-block. */
 void nq_q4_k_fit(const float *x, float *scale, float *min);
 
 /* ---------- Part A: reading and assembling bits ---------- */
 
 /* Assemble the 8 bytes at p, least significant first, into a 64-bit unsigned
- * integer. The framework reads the header length of a safetensors file with it. */
+ * integer. The framework reads the header length of a safetensors file with it.
+ */
 uint64_t rd_u64le(const uint8_t *p);
 
 /* BF16 bits to float. BF16 has the sign and exponent fields of FP32, and its
@@ -68,12 +70,12 @@ uint16_t f32_to_fp16(float f);
  * are written with f32_to_fp16 and read with fp16_to_f32, low byte first.
  * The formulas fix every rounding step, so one input has one correct output. */
 
-#define NQ_Q4_0_BLOCK_ELEMS  32
-#define NQ_Q4_0_BLOCK_BYTES  18   /* d:fp16, qs[16] */
-#define NQ_Q4_1_BLOCK_ELEMS  32
-#define NQ_Q4_1_BLOCK_BYTES  20   /* d:fp16, m:fp16, qs[16] */
+#define NQ_Q4_0_BLOCK_ELEMS 32
+#define NQ_Q4_0_BLOCK_BYTES 18 /* d:fp16, qs[16] */
+#define NQ_Q4_1_BLOCK_ELEMS 32
+#define NQ_Q4_1_BLOCK_BYTES 20 /* d:fp16, m:fp16, qs[16] */
 #define NQ_Q4_K_BLOCK_ELEMS 256
-#define NQ_Q4_K_BLOCK_BYTES 144   /* d:fp16, dmin:fp16, scales[12], qs[128] */
+#define NQ_Q4_K_BLOCK_BYTES 144 /* d:fp16, dmin:fp16, scales[12], qs[128] */
 
 /* Q4_0: 32 weights, 18 bytes.
  *
@@ -83,7 +85,8 @@ uint16_t f32_to_fp16(float f);
  *               id   = d != 0 ? 1.0f / d : 0.0f
  *               q[i] = min(15, (int)(x[i] * id + 8.5f))
  *   dequantize  x[i] = d * (float)(q[i] - 8)
- *   bytes       blk[0..1] = d,  blk[2 + j] = q[j] | q[j + 16] << 4   (j = 0..15)
+ *   bytes       blk[0..1] = d,  blk[2 + j] = q[j] | q[j + 16] << 4   (j =
+ * 0..15)
  *
  * The codes use the float d, before it is rounded to fp16. x[i] * id lies in
  * [-8, 8], so the cast truncates a positive number, which rounds x[i] * id + 8
@@ -99,7 +102,8 @@ void q4_0_dequantize(const uint8_t *blk, float *x);
  *               q[i] = min(15, (int)((x[i] - lo) * id + 0.5f))
  *               m    = lo
  *   dequantize  x[i] = d * (float)q[i] + m
- *   bytes       blk[0..1] = d,  blk[2..3] = m,  blk[4 + j] = q[j] | q[j + 16] << 4
+ *   bytes       blk[0..1] = d,  blk[2..3] = m,  blk[4 + j] = q[j] | q[j + 16]
+ * << 4
  *
  * As in Q4_0, the codes use the float d and lo, before rounding to fp16. */
 void q4_1_quantize(const float *x, uint8_t *blk);
@@ -114,7 +118,8 @@ void q4_1_dequantize(const uint8_t *blk, float *x);
  *        S = the largest s[j],  O = the largest o[j]
  *     2. d  = S / 63.0f,  dmin = O / 63.0f
  *        is = S > 0 ? 63.0f / S : 0.0f,  io = O > 0 ? 63.0f / O : 0.0f
- *        sc[j] = nq_round(is * s[j]),  m[j] = nq_round(io * o[j])   (both 0..63)
+ *        sc[j] = nq_round(is * s[j]),  m[j] = nq_round(io * o[j])   (both
+ * 0..63)
  *     3. D = fp16_to_f32(f32_to_fp16(d)) * (float)sc[j]
  *        M = fp16_to_f32(f32_to_fp16(dmin)) * (float)m[j]
  *        q[i] = D != 0 ? clamp(nq_round((x[i] + M) / D), 0, 15) : 0
@@ -123,7 +128,8 @@ void q4_1_dequantize(const uint8_t *blk, float *x);
  *   bytes
  *     blk[0..1] = d,  blk[2..3] = dmin,
  *     blk[4..15] = the 8 pairs (sc[j], m[j]), written with put_scale_min,
- *     blk[16 + 32*g + l] = q[64*g + l] | q[64*g + 32 + l] << 4   (g = 0..3, l = 0..31)
+ *     blk[16 + 32*g + l] = q[64*g + l] | q[64*g + 32 + l] << 4   (g = 0..3, l =
+ * 0..31)
  *
  * Step 3 uses d and dmin after the fp16 round trip, the values the
  * dequantizer reads back. Sub-block j is restored by the formula

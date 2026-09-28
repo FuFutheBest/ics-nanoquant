@@ -19,80 +19,89 @@
 #include "nano_quant.h"
 
 static void todo(const char *who) {
-    fprintf(stderr, "nano_quant.cpp: %s is not implemented yet\n", who);
-    exit(3);
+  fprintf(stderr, "nano_quant.cpp: %s is not implemented yet\n", who);
+  exit(3);
 }
 
 /* ================= Part A: reading and assembling bits ================= */
 
 uint64_t rd_u64le(const uint8_t *p) {
-    (void)p;
-    todo("rd_u64le");
-    return 0;
+  (void)p;
+  todo("rd_u64le");
+  return 0;
 }
 
 float bf16_to_f32(uint16_t h) {
-    (void)h;
-    todo("bf16_to_f32");
-    return 0;
+  (void)h;
+  todo("bf16_to_f32");
+  return 0;
 }
 
 float fp16_to_f32(uint16_t h) {
-    (void)h;
-    todo("fp16_to_f32");
-    return 0;
+  (void)h;
+  todo("fp16_to_f32");
+  return 0;
 }
 
 uint16_t f32_to_fp16(float f) {
-    (void)f;
-    todo("f32_to_fp16");
-    return 0;
+  (void)f;
+  todo("f32_to_fp16");
+  return 0;
 }
 
 /* ================= Part B: three block formats ================= */
 
 void q4_0_quantize(const float *x, uint8_t *blk) {
-    (void)x; (void)blk;
-    todo("q4_0_quantize");
+  (void)x;
+  (void)blk;
+  todo("q4_0_quantize");
 }
 
 void q4_0_dequantize(const uint8_t *blk, float *x) {
-    (void)blk; (void)x;
-    todo("q4_0_dequantize");
+  (void)blk;
+  (void)x;
+  todo("q4_0_dequantize");
 }
 
 void q4_1_quantize(const float *x, uint8_t *blk) {
-    (void)x; (void)blk;
-    todo("q4_1_quantize");
+  (void)x;
+  (void)blk;
+  todo("q4_1_quantize");
 }
 
 void q4_1_dequantize(const uint8_t *blk, float *x) {
-    (void)blk; (void)x;
-    todo("q4_1_dequantize");
+  (void)blk;
+  (void)x;
+  todo("q4_1_dequantize");
 }
 
 /* Given. Write put_scale_min so that this function reads back what it wrote. */
 void get_scale_min(int j, const uint8_t *q, uint8_t *sc, uint8_t *m) {
-    if (j < 4) {
-        *sc = q[j] & 63;
-        *m  = q[j + 4] & 63;
-    } else {
-        *sc = (uint8_t)((q[j + 4] & 0xf) | ((q[j - 4] >> 6) << 4));
-        *m  = (uint8_t)((q[j + 4] >>  4) | ((q[j    ] >> 6) << 4));
-    }
+  if (j < 4) {
+    *sc = q[j] & 63;
+    *m = q[j + 4] & 63;
+  } else {
+    *sc = (uint8_t)((q[j + 4] & 0xf) | ((q[j - 4] >> 6) << 4));
+    *m = (uint8_t)((q[j + 4] >> 4) | ((q[j] >> 6) << 4));
+  }
 }
 
 void put_scale_min(int j, uint8_t *q, uint8_t sc, uint8_t m) {
-    (void)j; (void)q; (void)sc; (void)m;
-    todo("put_scale_min");
+  (void)j;
+  (void)q;
+  (void)sc;
+  (void)m;
+  todo("put_scale_min");
 }
 
 void q4_k_quantize(const float *x, uint8_t *blk) {
-    (void)x; (void)blk;
-    todo("q4_k_quantize");
+  (void)x;
+  (void)blk;
+  todo("q4_k_quantize");
 }
 
 void q4_k_dequantize(const uint8_t *blk, float *x) {
-    (void)blk; (void)x;
-    todo("q4_k_dequantize");
+  (void)blk;
+  (void)x;
+  todo("q4_k_dequantize");
 }

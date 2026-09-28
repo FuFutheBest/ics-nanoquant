@@ -19,26 +19,31 @@
 export OLLAMA_VERSION
 
 case $(uname -s) in
-Linux|Darwin)
-    ;;
-MINGW*|MSYS*|CYGWIN*)
-    echo "install-ollama: on Windows, run OllamaSetup.exe from" \
-         "https://ollama.com/download/windows, or run this script inside WSL2" >&2
-    exit 2 ;;
+Linux | Darwin)
+  ;;
+MINGW* | MSYS* | CYGWIN*)
+  echo "install-ollama: on Windows, run OllamaSetup.exe from" \
+    "https://ollama.com/download/windows, or run this script inside WSL2" >&2
+  exit 2
+  ;;
 *)
-    echo "install-ollama: the official script supports Linux and macOS, not $(uname -s)" >&2
-    exit 2 ;;
+  echo "install-ollama: the official script supports Linux and macOS, not $(uname -s)" >&2
+  exit 2
+  ;;
 esac
 
-command -v curl >/dev/null 2>&1 || { echo "install-ollama: curl is needed" >&2; exit 2; }
+command -v curl >/dev/null 2>&1 || {
+  echo "install-ollama: curl is needed" >&2
+  exit 2
+}
 
 # download the whole script before running it: a download cut short would
 # otherwise run as a shorter script
 tmp=$(mktemp) || exit 2
 trap 'rm -f "$tmp"' EXIT
 curl -fsSL -o "$tmp" https://ollama.com/install.sh || {
-    echo "install-ollama: cannot download https://ollama.com/install.sh" >&2
-    exit 2
+  echo "install-ollama: cannot download https://ollama.com/install.sh" >&2
+  exit 2
 }
 echo "install-ollama: installing ollama ${OLLAMA_VERSION:-(latest)}" >&2
 sh "$tmp"
