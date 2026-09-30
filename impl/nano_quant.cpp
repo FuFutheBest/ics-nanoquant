@@ -26,6 +26,23 @@ static void todo(const char *who) {
 
 /* ================= Part A: reading and assembling bits ================= */
 
+/*
+ * +------+------+----------+----------+-------+
+ * | type | sign | exponent | fraction | total |
+ * +------+------+----------+----------+-------+
+ * | fp16 | 1    | 5        | 10       | 16    |
+ * | f32  | 1    | 8        | 23       | 32    |
+ * | bf16 | 1    | 8        | 7        | 16    |
+ * +------+------+----------+----------+-------+
+ *
+ * f32:
+ * Normal     0<exp<255
+ * Subnormal  exp=0
+ * Zero       exp=0       frac=0
+ * Infinity   exp=255     frac=0
+ * NaN        exp=255     frac!=0
+ */
+
 uint64_t rd_u64le(const uint8_t *p) {
   uint64_t res = 0;
   for (int i = 0; i < 8; ++i) {
