@@ -20,10 +20,10 @@
 
 #include "nano_quant.h"
 
-static void todo(const char *who) {
-  fprintf(stderr, "nano_quant.cpp: %s is not implemented yet\n", who);
-  exit(3);
-}
+// static void todo(const char *who) {
+//   fprintf(stderr, "nano_quant.cpp: %s is not implemented yet\n", who);
+//   exit(3);
+// }
 
 /* ================= Part A: reading and assembling bits ================= */
 
@@ -293,21 +293,120 @@ void get_scale_min(int j, const uint8_t *q, uint8_t *sc, uint8_t *m) {
 }
 
 void put_scale_min(int j, uint8_t *q, uint8_t sc, uint8_t m) {
-  (void)j;
-  (void)q;
-  (void)sc;
-  (void)m;
-  todo("put_scale_min");
+  if (j < 4) {
+    uint8_t q_sc = q[j];
+    uint8_t q_m = q[j + 4];
+    uint8_t sc_write = (q_sc & 0xc0) | (sc & 0x3f);
+    uint8_t m_write = (q_m & 0xc0) | (m & 0x3f);
+    memcpy(q + j, &sc_write, 1);
+    memcpy(q + j + 4, &m_write, 1);
+  } else {
+    uint8_t sc_lo4 = sc & 0xf;
+    uint8_t sc_hi2 = (sc >> 4) & 0x3;
+    uint8_t m_lo4 = (m & 0xf);
+    uint8_t m_hi2 = (m >> 4) & 0x3;
+    uint8_t q_sc = q[j - 4];
+    uint8_t q_m = q[j];
+
+    uint8_t lo_write = sc_lo4 | (m_lo4 << 4);
+    uint8_t hi_sc_write = (q_sc & 0x3f) | (sc_hi2 << 6);
+    uint8_t hi_m_write = (q_m & 0x3f) | (m_hi2 << 6);
+
+    memcpy(q + j + 4, &lo_write, 1);
+    memcpy(q + j - 4, &hi_sc_write, 1);
+    memcpy(q + j, &hi_m_write, 1);
+  }
 }
 
 void q4_k_quantize(const float *x, uint8_t *blk) {
-  (void)x;
-  (void)blk;
-  todo("q4_k_quantize");
+  float s[8], o[8];
+  for (int j = 0; j < 8; ++j) {
+    nq_q4_k_fit(x + 32 * j, &s[j], &o[j]);
+  }
+
+  float smax = s[0], omax = o[0];
+  for (int j = 1; j < 8; ++j) {
+    if (s[j] > smax)
+      smax = s[j];
+    if (o[j] > omax)
+      omax = o[j];
+  }
+
+  if (smax == -0.0f) {
+    smax = 0.0f;
+  }
+
+  // << 请输入文本 >>
+  if (omax == -0.0f) {
+    omax = 0.0f;
+  }
+
+  float d = smax / 63.0f;
+  float dmin = omax / 63.0f;
+  float is = (smax > 0) ? 63.0f / smax : 0.0f;
+  float io = (omax > 0) ? 63.0f / omax : 0.0f;
+
+  uint16_t fp16_d = f32_to_fp16(d);
+  uint16_t fp16_dmin = f32_to_fp16(dmin);
+
+  memcpy(&blk[0], &fp16_d, 2);
+  memcpy(&blk[2], &fp16_dmin, 2);
+
+  float d1 = fp16_to_f32(fp16_d);
+  float dmin1 = fp16_to_f32(fp16_dmin);
+
+  uint8_t sc, m;
+  float D, M;
+  int idx, q;
+  uint8_t blk_lo, blk_write;
+  for (int j = 0; j < 8; ++j) {
+    sc = (uint8_t)nq_round(is * s[j]);
+    m = (uint8_t)nq_round(io * o[j]);
+    put_scale_min(j, blk + 4, sc, m);
+
+    D = d1 * (float)sc;
+    M = dmin1 * (float)m;
+    for (int i = 0; i < 32; ++i) {
+      idx = j * 32 + i;
+      q = (D != 0) ? (int)nq_round((x[idx] + M) / D) : 0;
+      if (q < 0)
+        q = 0;
+      if (q > 15)
+        q = 15;
+      if (j % 2 == 0) {
+        memcpy(&blk[16 + 32 * (j / 2) + i], &q, 1);
+      } else {
+        blk_lo = blk[16 + 32 * (j / 2) + i];
+        blk_write = (blk_lo & 0x0F) | ((q & 0x0F) << 4);
+        memcpy(&blk[16 + 32 * (j / 2) + i], &blk_write, 1);
+      }
+    }
+  }
 }
 
 void q4_k_dequantize(const uint8_t *blk, float *x) {
-  (void)blk;
-  (void)x;
-  todo("q4_k_dequantize");
+  uint16_t fp16_d, fp16_dmin;
+  memcpy(&fp16_d, &blk[0], 2);
+  memcpy(&fp16_dmin, &blk[2], 2);
+
+  float d = fp16_to_f32(fp16_d);
+  float dmin = fp16_to_f32(fp16_dmin);
+
+  uint8_t sc, m;
+  for (int i = 0; i < 8; ++i) {
+    get_scale_min(i, blk + 4, &sc, &m);
+    float D = d * (float)sc;
+    float M = dmin * (float)m;
+
+    for (int j = 0; j < 32; ++j) {
+      int idx = i * 32 + j;
+      int q;
+      if (i % 2 == 0) {
+        q = blk[16 + 32 * (i / 2) + j] & 0x0F;
+      } else {
+        q = (blk[16 + 32 * (i / 2) + j] >> 4) & 0x0F;
+      }
+      x[idx] = D * (float)q - M;
+    }
+  }
 }
