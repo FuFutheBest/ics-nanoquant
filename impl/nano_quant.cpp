@@ -13,6 +13,7 @@
  * flags in the Makefile.
  */
 #include <cstdint>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -185,27 +186,98 @@ uint16_t f32_to_fp16(float f) {
 /* ================= Part B: three block formats ================= */
 
 void q4_0_quantize(const float *x, uint8_t *blk) {
-  (void)x;
-  (void)blk;
-  todo("q4_0_quantize");
+  float amax = x[0];
+  for (int i = 1; i < 32; ++i) {
+    if (fabsf(x[i]) > fabsf(amax)) {
+      amax = x[i];
+    }
+  }
+  float d = amax / -8.0f;
+  float id = (d != 0) ? 1.0f / d : 0.0f;
+
+  uint16_t fp16_d = f32_to_fp16(d);
+  memcpy(&blk[0], &fp16_d, 2);
+
+  for (int i = 0; i < 32; ++i) {
+    int q = (int)(x[i] * id + 8.5f);
+    if (q < 0)
+      q = 0;
+    if (q > 15)
+      q = 15;
+
+    if (i < 16) {
+      blk[2 + i] = (uint8_t)q;
+    } else {
+      blk[2 + (i - 16)] |= (uint8_t)(q << 4);
+    }
+  }
 }
 
 void q4_0_dequantize(const uint8_t *blk, float *x) {
-  (void)blk;
-  (void)x;
-  todo("q4_0_dequantize");
+  uint16_t fp16_d;
+  memcpy(&fp16_d, &blk[0], 2);
+  float d = fp16_to_f32(fp16_d);
+
+  int q;
+  for (int i = 0; i < 32; ++i) {
+    if (i < 16) {
+      q = blk[2 + i] & 0x0F;
+    } else {
+      q = (blk[2 + (i - 16)] >> 4) & 0x0F;
+    }
+    x[i] = d * (float)(q - 8);
+  }
 }
 
 void q4_1_quantize(const float *x, uint8_t *blk) {
-  (void)x;
-  (void)blk;
-  todo("q4_1_quantize");
+  float hi = x[0];
+  float lo = x[0];
+  for (int i = 1; i < 32; ++i) {
+    if (x[i] > hi) {
+      hi = x[i];
+    }
+    if (x[i] < lo) {
+      lo = x[i];
+    }
+  }
+  float d = (hi - lo) / 15.0f;
+  float id = d != 0 ? 1.0f / d : 0.0f;
+  float m = lo;
+  uint16_t fp16_d = f32_to_fp16(d);
+  uint16_t fp16_m = f32_to_fp16(m);
+  memcpy(&blk[0], &fp16_d, 2);
+  memcpy(&blk[2], &fp16_m, 2);
+  for (int i = 0; i < 32; ++i) {
+    int q = (int)((x[i] - lo) * id + 0.5f);
+    if (q < 0)
+      q = 0;
+    if (q > 15)
+      q = 15;
+    if (i < 16) {
+      blk[4 + i] = (uint8_t)q;
+    } else {
+      blk[4 + (i - 16)] |= (uint8_t)(q << 4);
+    }
+  }
 }
 
 void q4_1_dequantize(const uint8_t *blk, float *x) {
-  (void)blk;
-  (void)x;
-  todo("q4_1_dequantize");
+  float d, m;
+  uint16_t fp16_d, fp16_m;
+  memcpy(&fp16_d, &blk[0], 2);
+  memcpy(&fp16_m, &blk[2], 2);
+  d = fp16_to_f32(fp16_d);
+  m = fp16_to_f32(fp16_m);
+
+  int q;
+  for (int i = 0; i < 32; ++i) {
+    if (i < 16) {
+      q = blk[4 + i] & 0x0F;
+    } else {
+      q = (blk[4 + (i - 16)] >> 4) & 0x0F;
+    }
+    x[i] = d * (float)q + m;
+  }
 }
 
 /* Given. Write put_scale_min so that this function reads back what it wrote.
